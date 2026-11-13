@@ -34,7 +34,17 @@ export async function loadAssets(quality, onProgress = () => {}) {
   }));
   const gl = new GLTFLoader(manager);
   const models = {};
-  const modelJobs = MODELS.map((id) => gl.loadAsync(`${BASE}models/${id}.glb`).then((g) => { models[id] = g; tick(); }).catch((e) => { console.warn('model failed', id, e); tick(); }));
+  // Some static hosts only serve web media types. The packed page therefore ships each .glb as
+  // base64 inside a .json file (see scripts/make-artifact.mjs) and sets this flag.
+  const packed = typeof window !== 'undefined' && window.__PACKED_MODELS === true;
+  const loadModel = async (id) => {
+    if (!packed) return gl.loadAsync(`${BASE}models/${id}.glb`);
+    const { glb } = await (await fetch(`${BASE}models/${id}.json`)).json();
+    const bin = atob(glb), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return gl.parseAsync(bytes.buffer, '');
+  };
+  const modelJobs = MODELS.map((id) => loadModel(id).then((g) => { models[id] = g; tick(); }).catch((e) => { console.warn('model failed', id, e); tick(); }));
   await Promise.all([...texJobs, ...modelJobs]);
   return { tex, models };
 }

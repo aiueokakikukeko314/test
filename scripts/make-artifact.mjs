@@ -10,13 +10,19 @@ if (count(js, /<!--/g)) throw new Error('bundle contains "<!--": cannot inline s
 const safe = js.replace(/<\/script/gi, '<\\/script');
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
-fs.cpSync(path.join(dist, 'assets/models'), path.join(out, 'assets/models'), { recursive: true });
+fs.mkdirSync(path.join(out, 'assets/models'), { recursive: true });
+for (const f of fs.readdirSync(path.join(dist, 'assets/models'))) {
+  if (!f.endsWith('.glb')) continue;
+  const glb = fs.readFileSync(path.join(dist, 'assets/models', f)).toString('base64');
+  fs.writeFileSync(path.join(out, 'assets/models', f.replace(/\.glb$/, '.json')), JSON.stringify({ glb }));
+}
 fs.cpSync(path.join(dist, 'assets/textures'), path.join(out, 'assets/textures'), { recursive: true });
 const page = `<title>朝の森と川</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>${css}</style>
 <canvas id="view"></canvas>
 <div id="ui"></div>
+<script>window.__PACKED_MODELS = true;</script>
 <script type="module">${safe}</script>
 `;
 fs.writeFileSync(path.join(out, 'index.html'), page);
