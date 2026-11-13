@@ -92,7 +92,7 @@ export function createWater(tex, shared, quality) {
           float distFade = 1.0 / (1.0 + length(vWPos - cameraPosition) * 0.035);
           nxy *= 0.35 + 0.65 * distFade;
           gWN = normalize(vec3(nxy.x, 1.0, nxy.y));
-          gShore = smoothstep(0.05, 0.0, gDepth - 0.03 * f2) * smoothstep(0.35, 0.75, f2 + f1 * 0.5);
+          gShore = smoothstep(0.035, 0.0, gDepth - 0.02 * f2) * smoothstep(0.45, 0.8, f2 + f1 * 0.5);
           gFleck = smoothstep(0.83, 0.9, f1 * 0.55 + f2 * 0.5) * smoothstep(0.3, 1.5, inside);
           normal = normalize((viewMatrix * vec4(gWN, 0.0)).xyz);
         }`)
@@ -112,12 +112,12 @@ export function createWater(tex, shared, quality) {
           vec3 skyRefl = mix(vec3(0.06, 0.10, 0.05), vec3(0.45, 0.58, 0.66), smoothstep(0.0, 0.5, gWN.y - NdV * 0.2));
           refl = mix(skyRefl, refl, uReflOn);
           // light scattered back out of the water column
-          vec3 scatter = vec3(0.022, 0.06, 0.04) * (0.5 + 2.0 * shadow);
-          float T = exp(-gDepth * 0.95 / max(NdV, 0.35));
+          vec3 scatter = vec3(0.02, 0.055, 0.036) * (0.5 + 1.8 * shadow);
+          float T = exp(-gDepth * 0.6 / max(NdV, 0.4));
           vec3 col = outgoingLight + refl * F + scatter * (1.0 - T) * (1.0 - F);
           float alpha = 1.0 - (1.0 - F) * T;
           // foam along the bank and drifting flecks in the current
-          float foam = clamp(gShore * 0.4 + gFleck * 0.22, 0.0, 1.0);
+          float foam = clamp(gShore * 0.3 + gFleck * 0.14, 0.0, 1.0);
           vec3 foamCol = vec3(0.75, 0.8, 0.8) * (0.25 + 1.5 * shadow);
           col = mix(col, foamCol, foam);
           alpha = mix(alpha, 1.0, foam);

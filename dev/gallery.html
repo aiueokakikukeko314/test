@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#667}canvas{display:block}</style></head>
+<body><script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { MODELS } from '/src/assets.js';
+import { toFloatGeometry } from '/src/world/scatter.js';
+const params = new URLSearchParams(location.search);
+const only = params.get('m');
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(innerWidth, innerHeight); document.body.appendChild(renderer.domElement);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8899aa);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445533, 1.6)); const sun = new THREE.DirectionalLight(0xffffff, 3); sun.position.set(3, 5, 4); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 200);
+const gl = new GLTFLoader(); gl.setMeshoptDecoder(MeshoptDecoder);
+const list = only ? only.split(',') : MODELS;
+let x = 0; const items = [];
+for (const id of list) {
+  const g = await gl.loadAsync(`/assets/models/${id}.glb`);
+  g.scene.updateMatrixWorld(true);
+  g.scene.traverse((o) => { if (!o.isMesh) return;
+    const geo = toFloatGeometry(o.geometry); geo.applyMatrix4(o.matrixWorld); geo.computeBoundingBox(); const bb = geo.boundingBox; const s = bb.getSize(new THREE.Vector3());
+    const k = 1 / Math.max(s.x, s.y, s.z);
+    geo.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); geo.scale(k, k, k);
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: o.material.map, normalMap: o.material.normalMap, alphaTest: o.material.alphaTest || (o.material.transparent ? 0.4 : 0), side: THREE.DoubleSide, roughness: 0.9 }));
+    m.position.x = x; x += 1.25; scene.add(m); items.push(id + ':' + o.name + ' tris=' + geo.index.count / 3 + ' size=' + s.toArray().map((v) => v.toFixed(2)));
+  });
+}
+const yaw = Number(params.get('yaw') || 0.6), pitch = Number(params.get('pitch') || 0.35);
+const w = x - 1.25, d = Math.max(3, w * 0.5 / Math.tan(0.305 * cam.aspect) + 1.5);
+cam.position.set(w / 2 + Math.sin(yaw) * d * 0.25, 0.4 + Math.sin(pitch) * d, Math.cos(pitch) * d); cam.lookAt(w / 2, 0.4, 0);
+renderer.render(scene, cam); window.__info = items; window.__ready = true;
+</script></body></html>

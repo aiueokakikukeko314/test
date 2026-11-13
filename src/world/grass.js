@@ -16,7 +16,7 @@ export function createGrass(shared, quality) {
     const cx = Math.cos(rot), sz = Math.sin(rot), hs = 0.7 + rand() * 0.45;
     const base = pos.length / 3;
     for (let s = 0; s <= SEG; s++) {
-      const t = s / SEG, w = 0.0085 * (1 - t * t * 0.9) * (0.8 + rand() * 0.5);
+      const t = s / SEG, w = 0.007 * (1 - t * t * 0.9) * (0.8 + rand() * 0.5);
       if (s === SEG) { pos.push(ox, t * hs, oz); bn.push(-sz, cx); }
       else { pos.push(ox - cx * w, t * hs, oz - sz * w, ox + cx * w, t * hs, oz + sz * w); bn.push(-sz, cx, -sz, cx); }
     }
@@ -60,9 +60,9 @@ export function createGrass(shared, quality) {
           vec2 wxz = cameraPosition.xz + rel;
           vec4 hm = texture2D(tHeight, wxz / uWorld + 0.5);
           float fade = 1.0 - smoothstep(0.62, 0.98, length(rel) / (0.5 * uTile));
-          float dens = hm.g;
+          float dens = hm.g * (0.45 + 0.9 * hm.a);
           float keep = step(rnd.x, dens * 1.1) * step(0.12, hm.r);
-          float hgt = (0.12 + 0.36 * rnd.y * rnd.y * (0.35 + 0.65 * dens) + 0.1 * dens) * fade * keep;
+          float hgt = (0.07 + 0.3 * rnd.y * rnd.y * (0.3 + 0.7 * dens) + 0.06 * dens) * fade * keep;
           float ang = rnd.z * 6.2831853;
           float ca = cos(ang), sa = sin(ang);
           float wid = 0.8 + 0.6 * rnd.w;
@@ -77,8 +77,8 @@ export function createGrass(shared, quality) {
           vec2 bnr = vec2(bnormal.x * ca - bnormal.y * sa, bnormal.x * sa + bnormal.y * ca);
           objectNormal = normalize(vec3(bnr.x * 0.35, 1.0, bnr.y * 0.35));
           float hue = rnd.w;
-          vec3 root = vec3(0.035, 0.07, 0.018);
-          vec3 tip = mix(vec3(0.17, 0.30, 0.06), vec3(0.30, 0.34, 0.10), hue * hue);
+          vec3 root = vec3(0.05, 0.09, 0.022);
+          vec3 tip = mix(vec3(0.25, 0.40, 0.07), vec3(0.42, 0.44, 0.13), hue * hue);
           vGrassCol = mix(root, tip, position.y) * (0.75 + 0.5 * rnd.y);
         }`)
       .replace('#include <begin_vertex>', `vec3 transformed = gPos;`);

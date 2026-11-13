@@ -7,13 +7,27 @@ import { fbm, mulberry32, smoothstep } from '../util/noise.js';
 import { LodInstances, composeMatrix } from './instancing.js';
 import { applyWind, applyTranslucency, makeWindDepthMaterial } from './foliage.js';
 
+// Meshopt/quantised glTF stores positions as normalised integers. Convert to plain floats
+// before baking transforms, otherwise values are clamped to the integer range.
+export function toFloatGeometry(src) {
+  const g = new THREE.BufferGeometry();
+  for (const name of Object.keys(src.attributes)) {
+    const a = src.attributes[name];
+    const out = new Float32Array(a.count * a.itemSize);
+    for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out[i * a.itemSize + c] = a.getComponent(i, c);
+    g.setAttribute(name, new THREE.BufferAttribute(out, a.itemSize));
+  }
+  if (src.index) g.setIndex(new THREE.BufferAttribute(Uint32Array.from(src.index.array), 1));
+  return g;
+}
+
 // Pull every mesh out of a glTF scene as a recentred geometry (base at y=0, centred in xz).
 function extractVariants(gltf) {
   const out = [];
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return;
-    const g = o.geometry.clone();
+    const g = toFloatGeometry(o.geometry);
     g.applyMatrix4(o.matrixWorld);
     g.computeBoundingBox();
     const bb = g.boundingBox;
@@ -111,7 +125,8 @@ export async function createScatter(models, shared, quality, world) {
         composeMatrix(mats, i * 16, o.x, o.y, o.z, o.rot, o.scale, o.tx, o.tz, o.scale * (spec.scaleY ? spec.scaleY[0] + o.v * (spec.scaleY[1] - spec.scaleY[0]) : 1));
         const b = plant ? 0.72 + o.v * 0.42 : 0.82 + o.v * 0.3;
         const warm = plant ? 0.92 + ((o.v * 5.7) % 1) * 0.2 : 1;
-        cols[i * 3] = b * warm; cols[i * 3 + 1] = b; cols[i * 3 + 2] = b * (2 - warm);
+        const tn = spec.tint || [1, 1, 1];
+        cols[i * 3] = b * warm * tn[0]; cols[i * 3 + 1] = b * tn[1]; cols[i * 3 + 2] = b * (2 - warm) * tn[2];
         if (spec.colliderMin && o.radius > spec.colliderMin) world.colliders.add({ x: o.x, z: o.z, r: o.radius * (spec.colliderScale || 0.75) });
         if (spec.kind === 'rock' && o.dOut < 0.3) rocksInWater.push(o);
       });
@@ -150,7 +165,7 @@ export async function createScatter(models, shared, quality, world) {
     place: (x, z, i) => (i.dOut > 0.5 && i.dOut < 10 ? 0.55 : 0.12 * (1 - i.clear)) });
 
   // ---- ferns: shady forest floor, in drifts
-  addType({ model: 'fern_02', kind: 'plant', size: [0.75, 1.5], scaleY: [1.4, 2.1], spacing: 1.7 / Math.sqrt(D), sink: 0.03, lodDist: 15, range: R, lodRatio: 0.5, lodError: 0.012, layer: 1, shadow: true,
+  addType({ model: 'fern_02', kind: 'plant', tint: [0.62, 1.0, 0.5], size: [0.75, 1.5], scaleY: [1.4, 2.1], spacing: 1.7 / Math.sqrt(D), sink: 0.03, lodDist: 15, range: R, lodRatio: 0.5, lodError: 0.012, layer: 1, shadow: true,
     place: (x, z, i) => (i.dOut > 0.8 ? smoothstep(0.42, 0.62, patch(x, z, 0.07, 5)) * (1 - i.clear * 0.85) * 0.8 + 0.05 : 0) });
   // ---- leafy undergrowth
   addType({ model: 'shrub_02', kind: 'plant', size: [0.6, 1.3], spacing: 3.3 / Math.sqrt(D), sink: 0.02, lodDist: 14, range: R, lodRatio: 0.5, lodError: 0.012, layer: 1,
