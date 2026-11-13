@@ -24,7 +24,7 @@ export function createCinematic(app) {
     },
     { // sun shafts in the forest interior: slow rise among the trunks
       dur: 13, fov: 46, dof: null,
-      update(u) { const x = riverX(-30) + 34, z = -30 + u * 5; pos.copy(ground(x, z, 0.5 + u * 2.4)); look.set(pos.x - 14, pos.y + 2.2 + u * 1.5, pos.z - 22); },
+      update(u) { const c = CLEARINGS[0]; pos.copy(ground(c.x + 5 - u * 4, c.z + c.r + 3 - u * 2, 0.7 + u * 1.3)); look.set(pos.x - 11.5, pos.y + 5.5 + u * 2, pos.z - 21.6); },
     },
     { // fish holding in the current, looking straight down through the water
       dur: 12, fov: 38, dof: null,

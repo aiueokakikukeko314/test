@@ -7,8 +7,8 @@ They were simplified and recompressed for the web.
 - Models: fern_02, rock_moss_set_01, rock_moss_set_02, rock_07, rock_09, stone_01, tree_stump_01, tree_stump_02,
   dead_tree_trunk, dry_branches_medium_01, shrub_02, shrub_03, nettle_plant, weed_plant_02, dandelion_01,
   periwinkle_plant, root_cluster_01
-- Textures: forest_leaves_02, forrest_ground_01, river_small_rocks, brown_mud_leaves_01, mossy_rock,
-  forest_ground_04, japanese_cedar_bark
+- Textures: forest_leaves_02, forrest_ground_01, river_small_rocks, brown_mud_leaves_01, mossy_rock
+  (terrain layers)
 
 ## Fox model
 `public/assets/models/Fox.glb` from the Khronos glTF Sample Assets.

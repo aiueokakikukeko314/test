@@ -31,7 +31,7 @@ const VOL_FRAG = /* glsl */ `
     float cosT = dot(rd, FOG_SUN_DIR);
     const float g = 0.5;
     float phase = (1.0 - g * g) / (12.566 * pow(1.0 + g * g - 2.0 * g * cosT, 1.5));
-    phase = phase * 0.85 + 0.012;   // a little isotropic scattering so side-lit shafts still read
+    phase = phase * 0.8 + 0.04;   // a little isotropic scattering so side-lit shafts still read
     float acc = 0.0;
     for (int i = 0; i < VOL_STEPS; i++) {
       float t = (float(i) + jitter) * stepLen;
@@ -121,7 +121,7 @@ class GradeEffect extends Effect {
         outputColor = vec4(max(c, 0.0), inputColor.a);
       }`, {
       blendFunction: BlendFunction.SET,
-      uniforms: new Map([['uSaturation', new THREE.Uniform(1.0)], ['uContrast', new THREE.Uniform(1.0)], ['uTime', new THREE.Uniform(0)]]),
+      uniforms: new Map([['uSaturation', new THREE.Uniform(1.1)], ['uContrast', new THREE.Uniform(1.05)], ['uTime', new THREE.Uniform(0)]]),
     });
   }
 }
@@ -162,7 +162,7 @@ export function createPost(renderer, scene, camera, sun, quality) {
   black.needsUpdate = true;
   const composite = new CompositeEffect(vol ? vol.texture : black);
   composite.uniforms.get('uExposure').value = 0.62;
-  composite.uniforms.get('uStrength').value = 0.42;
+  composite.uniforms.get('uStrength').value = 0.85;
   const effects = [composite];
   if (quality.bloom) {
     effects.push(new BloomEffect({ intensity: 0.55, luminanceThreshold: 1.0, luminanceSmoothing: 0.35, mipmapBlur: true, radius: 0.72 }));

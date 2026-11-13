@@ -6,9 +6,9 @@ import { SUN_DIR } from './layout.js';
 export const sunDir = new THREE.Vector3(...SUN_DIR).normalize();
 
 export const ATMOS = {
-  sunColor: new THREE.Color(1.0, 0.83, 0.64),
+  sunColor: new THREE.Color(1.0, 0.8, 0.57),
   sunIntensity: 6.5,
-  fogColor: new THREE.Color(0.36, 0.45, 0.5),
+  fogColor: new THREE.Color(0.4, 0.46, 0.45),
   fogSunColor: new THREE.Color(0.95, 0.74, 0.5),
   mistDensity: 0.0085,   // extra density at water level (mist pooling in the valley)
   mistFalloff: 0.3,    // 1/m: how fast the mist thins out with height
@@ -99,7 +99,7 @@ const SKY_FRAG = /* glsl */ `
     } else {
       // ambient: dim the sky as if seen through a canopy; ground bounce from below
       float can = smoothstep(0.35, 0.6, fbm(rd.xz / (abs(rd.y) + 0.35) * 2.2));
-      col = mix(col, vec3(0.045, 0.075, 0.022), can * 0.72 * smoothstep(-0.05, 0.3, rd.y));
+      col = mix(col, vec3(0.085, 0.115, 0.035), can * 0.8 * smoothstep(-0.05, 0.3, rd.y));
       col = mix(vec3(0.075, 0.07, 0.04), col, smoothstep(-0.25, 0.05, rd.y));
     }
     // melt the horizon into the fog so distant terrain blends seamlessly

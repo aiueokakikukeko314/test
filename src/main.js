@@ -17,11 +17,18 @@ import { createBirds } from './fauna/birds.js';
 import { createButterflies } from './fauna/butterflies.js';
 import { createFox } from './fauna/fox.js';
 import { createParticles } from './world/particles.js';
+import { createAudio } from './audio.js';
+import { createCinematic } from './cinematic.js';
+import { createUI } from './ui.js';
+import { lodState } from './world/instancing.js';
 
 const params = new URLSearchParams(location.search);
 const SHOT = params.has('shot');
 const quality = pickQuality(params);
 const canvas = document.getElementById('view');
+const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
+const ui = createUI(document.getElementById('ui'), { qualityName: quality.name, touch: TOUCH });
+const STAGES = { assets: [0, 0.35, '素材を読み込み中…'], forest: [0.35, 0.9, '森を育てています…'], world: [0.9, 1, '動物たちを起こしています…'] };
 
 const shared = {
   time: { value: 0 },
@@ -56,6 +63,8 @@ async function boot() {
   for (const t of forest.trees) world.colliders.add(t);
   world.trees = forest.trees;
 
+  progress('world', 0.1);
+  await new Promise((r) => setTimeout(r, 0));
   const scatter = await createScatter(models, shared, quality, world);
   scene.add(scatter.group);
   const grass = createGrass(shared, quality);
@@ -115,36 +124,138 @@ async function boot() {
       camera.lookAt(d.pos.x, d.pos.y + 0.75 * d.scale, d.pos.z);
       player.update = () => {}; player.pos.set(cx, 0, cz);
     }
-  } else {
-    player.enabled = true;
-    canvas.addEventListener('click', () => canvas.requestPointerLock && canvas.requestPointerLock());
   }
 
-  const clock = new THREE.Clock();
-  let frames = 0;
-  function frame() {
-    const dt = Math.min(clock.getDelta(), 0.05);
-    if (!SHOT) shared.time.value += dt;
-    player.update(SHOT ? 0 : dt);
-    if (!SHOT) for (const f of fauna) f.update(dt, player);
+  // ---------- modes: 'menu' (film plays behind the menu), 'explore', 'film'
+  const audio = createAudio();
+  const app = { renderer, scene, camera, player, world, post, quality, deer, fish, birds, fox, shared };
+  const cinematic = createCinematic(app);
+  const farAway = { pos: new THREE.Vector3(1e4, 0, 1e4), speed: 0 };
+  let mode = 'menu', paused = false, everExplored = false;
+  const savedView = { x: shared.spawn.x, z: shared.spawn.z, yaw: 0.5, pitch: -0.05 };
+
+  function lockPointer() {
+    try { const r = canvas.requestPointerLock && canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch { /* not available */ }
+  }
+  function setMode(next) {
+    if (mode === 'explore') { savedView.x = player.pos.x; savedView.z = player.pos.z; savedView.yaw = player.yaw; savedView.pitch = player.pitch; }
+    mode = next;
+    if (next === 'explore') {
+      cinematic.stop(); post.setDof(false);
+      camera.fov = 62; camera.updateProjectionMatrix();
+      player.place(savedView.x, savedView.z, savedView.yaw, savedView.pitch);
+      player.enabled = true; everExplored = true;
+      ui.setFade(0); ui.showMenu(false); ui.setMode('explore');
+      if (!TOUCH) lockPointer();
+    } else {
+      player.enabled = false;
+      if (!cinematic.state.active) cinematic.start(0);
+      if (document.pointerLockElement) document.exitPointerLock();
+      if (next === 'film') { ui.showMenu(false); ui.setMode('film'); } else { ui.showMenu(true, everExplored); ui.setMode('menu'); }
+    }
+    forest.update(camera.position, true); scatter.update(camera.position, true);
+  }
+  ui.on('explore', () => { audio.start(); setMode('explore'); });
+  ui.on('film', () => { audio.start(); setMode('film'); });
+  ui.on('menu', () => setMode('menu'));
+  ui.on('toggleMode', () => setMode(mode === 'film' ? 'explore' : 'film'));
+  ui.on('nextShot', () => cinematic.next());
+  ui.on('toggleSound', () => { audio.start(); audio.setMuted(!audio.muted); ui.setSound(!audio.muted); });
+  ui.on('quality', (q) => { try { localStorage.setItem('forest-quality', q); } catch { /* private mode */ } const u = new URL(location.href); u.searchParams.delete('q'); location.href = u.toString(); });
+  player.onStep = (kind, running) => audio.step(kind, running);
+  player.onStick = (x, y, dx, dy) => ui.stick(x, y, dx, dy);
+
+  addEventListener('keydown', (e) => {
+    if (e.repeat || mode === 'menu') return;
+    if (e.code === 'KeyC') setMode(mode === 'film' ? 'explore' : 'film');
+    else if (e.code === 'KeyM') { audio.setMuted(!audio.muted); ui.setSound(!audio.muted); }
+    else if (e.code === 'KeyH') ui.toggleHud();
+    else if (e.code === 'KeyN' && mode === 'film') cinematic.next();
+    else if (e.code === 'Escape' && mode === 'film') setMode('menu');
+  });
+  canvas.addEventListener('click', () => { if (mode === 'explore' && !TOUCH && document.pointerLockElement !== canvas) lockPointer(); });
+  document.addEventListener('pointerlockchange', () => {
+    // leaving pointer lock while exploring (Esc) opens the menu
+    if (!TOUCH && mode === 'explore' && document.pointerLockElement !== canvas) setMode('menu');
+  });
+  document.addEventListener('visibilitychange', () => { paused = document.hidden; if (paused) audio.suspend(); else audio.resume(); });
+
+  // gentle wildlife notices while exploring
+  const seen = new Set();
+  function notices() {
+    const p = player.pos;
+    const near = (name, pos, dist, text) => { if (!seen.has(name) && pos.distanceTo(p) < dist) { seen.add(name); ui.toast(text); } };
+    near('deer', deer.list[0].pos, 30, 'ニホンジカの群れが草を食べています');
+    near('deer2', deer.list[4].pos, 28, '親子のシカがいます — 静かに近づいて');
+    if (fox) near('fox', fox.state.pos, 26, 'キツネが岸辺を歩いています');
+    if (!seen.has('fish') && player.inWater > 0.1) { seen.add('fish'); ui.toast('足もとをヤマメが泳いでいます'); }
+  }
+
+  if (SHOT) {
+    ui.showMenu(false); document.getElementById('ui').style.display = params.has('ui') ? '' : 'none';
+    if (params.has('ui')) { ui.showMenu(params.get('ui') === 'menu'); ui.setMode(params.get('ui')); }
+    if (params.has('cine')) { cinematic.start(Number(params.get('cine'))); for (let i = 0, n = Number(params.get('u') || 0.4) * cinematic.shots[Number(params.get('cine'))].dur * 30; i < n; i++) cinematic.update(1 / 30, post); }
+  } else {
+    setMode('menu');
+  }
+
+  // ---------- main loop
+  const timer = new THREE.Timer();
+  let frames = 0, acc = 0, accN = 0, lastNotice = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (paused) return;
+    timer.update(now);
+    const dt = SHOT ? 0 : Math.min(Math.max(timer.getDelta(), 0), 0.05);
+    shared.time.value += dt;
+    if (mode === 'explore') {
+      player.update(dt);
+      for (const f of fauna) f.update(dt, player);
+      if ((lastNotice += dt) > 0.5) { lastNotice = 0; notices(); }
+    } else if (!SHOT) {
+      for (const f of fauna) f.update(dt, farAway);
+      cinematic.update(dt, post);
+      ui.setFade(cinematic.state.fade * (mode === 'menu' ? 0.6 : 1));
+    } else if (!params.has('view') && !params.has('cine')) player.update(0);
     camera.updateMatrixWorld();
+    lodState.scale = Math.round(Math.min(1.9, Math.max(1, 0.6 / Math.tan((camera.fov * Math.PI) / 360))) * 4) / 4;
     atmos.update(camera);
     forest.update(camera.position);
     scatter.update(camera.position);
+    audio.update(dt, camera.position, player.yaw, shared.time.value);
     renderer.info.reset();
     water.renderReflection(renderer, scene, camera);
     post.render(dt, shared.time.value);
     frames++;
     if (frames === (SHOT ? Number(params.get('frames') || 3) : 3)) {
-      window.__ready = true; window.__info = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, scatter: scatter.sets.map((s) => [s.name, s.stats.n, ...s.stats.tris, '|', ...s.levels.map((l) => l.meshes[0].count)].join(' ')), forest: forest.sets.map((s) => [s.name, s.stats.n, ...s.stats.tris, '|', ...s.levels.map((l) => l.meshes[0].count)].join(' ')) };
-      if (SHOT) return; // freeze on this frame so a screenshot can be taken
+      window.__ready = true;
+      window.__info = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles };
+      if (SHOT) paused = true; // freeze on this frame so a screenshot can be taken
     }
-    requestAnimationFrame(frame);
+    // adaptive resolution: trade pixels for frame rate
+    if (!SHOT) {
+      acc += dt; accN++;
+      if (acc > 1.5) {
+        const avg = acc / accN; acc = 0; accN = 0;
+        const max = Math.min(devicePixelRatio || 1, quality.maxPixelRatio);
+        let pr = pixelRatio;
+        if (avg > 1 / 27 && pr > 0.5) pr = Math.max(0.5, pr * 0.86);
+        else if (avg < 1 / 52 && pr < max) pr = Math.min(max, pr * 1.08);
+        if (pr !== pixelRatio) { pixelRatio = pr; resize(); }
+      }
+    }
   }
-  frame();
-  window.__app = { renderer, scene, camera, player, world, post, quality, deer, fish, birds, fox };
+  requestAnimationFrame(frame);
+  window.__app = app;
 }
 
-function progress(stage, p) { window.__progress = `${stage} ${(p * 100) | 0}%`; }
+function progress(stage, p) {
+  window.__progress = `${stage} ${(p * 100) | 0}%`;
+  const [a, b, text] = STAGES[stage];
+  ui.setProgress(a + (b - a) * p, text);
+}
 
-boot().catch((e) => { console.error(e); window.__error = String(e && e.stack || e); });
+boot().catch((e) => {
+  console.error(e); window.__error = String((e && e.stack) || e);
+  ui.error('読み込みに失敗しました。WebGL2 に対応したブラウザで開いてください。');
+});

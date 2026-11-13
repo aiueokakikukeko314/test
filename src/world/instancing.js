@@ -12,6 +12,9 @@ export function composeMatrix(out, offset, x, y, z, rotY, scale, tiltX = 0, tilt
   _m.toArray(out, offset);
 }
 
+// Telephoto shots magnify distant objects, so LOD distances are stretched by this factor.
+export const lodState = { scale: 1 };
+
 export class LodInstances {
   /**
    * @param levels [{ maxDist, parts: [{ geometry, material, depthMaterial, castShadow, receiveShadow, layer }] }]
@@ -51,8 +54,8 @@ export class LodInstances {
   }
 
   update(camPos, force = false) {
-    if (!force && this.last.distanceToSquared(camPos) < this.moveThreshold * this.moveThreshold) return;
-    this.last.copy(camPos);
+    if (!force && this.scale === lodState.scale && this.last.distanceToSquared(camPos) < this.moveThreshold * this.moveThreshold) return;
+    this.last.copy(camPos); this.scale = lodState.scale;
     const { levels, matrices, colors, count, assigned, hysteresis } = this;
     const nL = levels.length;
     const counts = new Array(nL).fill(0);
@@ -63,7 +66,7 @@ export class LodInstances {
       let lvl = -1;
       const prev = assigned[i];
       for (let l = 0; l < nL; l++) {
-        const lim = levels[l].maxDist + (prev === l ? hysteresis : 0);
+        const lim = levels[l].maxDist * (l < nL - 1 ? lodState.scale : 1) + (prev === l ? hysteresis : 0);
         if (d < lim) { lvl = l; break; }
       }
       assigned[i] = lvl;

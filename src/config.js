@@ -33,6 +33,16 @@ export function pickQuality(params) {
   if (saved && QUALITY[saved]) return QUALITY[saved];
   const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
   if (mobile) return QUALITY.low;
+  // guess the GPU class from the renderer string; integrated chips start on medium / low
+  let gpu = '';
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    gpu = (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl ? gl.getParameter(gl.RENDERER) : '') || '';
+  } catch { /* ignore */ }
+  if (/swiftshader|llvmpipe|software/i.test(gpu)) return QUALITY.low;
+  if (/(rtx|gtx 1[06-9]|gtx 9[78]|radeon rx|radeon pro|arc|apple m[1-9]|apple gpu)/i.test(gpu)) return QUALITY.high;
+  if (/(intel|uhd|iris|mali|adreno|powervr)/i.test(gpu)) return QUALITY.medium;
   const cores = navigator.hardwareConcurrency || 4;
   return cores >= 8 ? QUALITY.high : QUALITY.medium;
 }
