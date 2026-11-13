@@ -1,0 +1,7 @@
+:root { color-scheme: dark; --ink: #f2efe6; --dim: rgba(242, 239, 230, 0.66); --glass: rgba(14, 22, 18, 0.46); --line: rgba(242, 239, 230, 0.18); }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0b100d; color: var(--ink);
+  font-family: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+#ui { position: fixed; inset: 0; pointer-events: none; user-select: none; -webkit-user-select: none; }
+#ui > * { pointer-events: auto; }
