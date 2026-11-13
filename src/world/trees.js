@@ -2,7 +2,7 @@
 // across the valley. Species are distributed by habitat (riverbank, slope, valley floor).
 import * as THREE from 'three';
 import { Tree } from '@dgreenheck/ez-tree';
-import { MeshoptSimplifier } from 'meshoptimizer';
+import { initSimplifier, simplifyIndices } from '../util/simplify.js';
 import { HALF, heightAt, riverDist, riverHalfWidth, clearingFactor } from './layout.js';
 import { fbm, mulberry32, smoothstep, clamp } from '../util/noise.js';
 import { LodInstances, composeMatrix } from './instancing.js';
@@ -100,10 +100,8 @@ function thinLeaves(src, every, grow) {
   return g;
 }
 
-function simplifyGeo(src, ratio, error) {
-  const idx = Uint32Array.from(src.index.array);
-  const target = Math.max(36, Math.floor((idx.length * ratio) / 3) * 3);
-  const [out] = MeshoptSimplifier.simplify(idx, src.attributes.position.array, 3, target, error);
+function simplifyGeo(src, ratio, error, cell) {
+  const out = simplifyIndices(Uint32Array.from(src.index.array), src.attributes.position.array, ratio, error, cell);
   const g = new THREE.BufferGeometry();
   for (const name of Object.keys(src.attributes)) g.setAttribute(name, src.attributes[name]);
   g.setIndex(new THREE.BufferAttribute(out, 1));
@@ -137,7 +135,7 @@ function farTrunk(bGeo, trunkR) {
 }
 
 export async function createForest(shared, quality, onProgress = () => {}) {
-  await MeshoptSimplifier.ready;
+  await initSimplifier();
   const rand = mulberry32(20241);
   const group = new THREE.Group();
   group.name = 'forest';
@@ -245,8 +243,8 @@ export async function createForest(shared, quality, onProgress = () => {}) {
         { maxDist: quality.lod[1] * 0.8, parts: [{ geometry: thinLeaves(lGeo, 2, 1.35), material: mkLeafMat(0.3), depthMaterial: leafDepth(0.3), castShadow: false }] },
       ]
       : [
-        { maxDist: quality.lod[0], parts: [{ geometry: simplifyGeo(bGeo, 0.5, 0.004), material: barkMat, depthMaterial: barkDepth, useColor: false }, { geometry: lGeo, material: mkLeafMat(0.42), depthMaterial: leafDepth(0.42) }] },
-        { maxDist: quality.lod[1], parts: [{ geometry: simplifyGeo(bGeo, 0.06, 0.06), material: barkMat, depthMaterial: barkDepth, useColor: false }, { geometry: thinLeaves(lGeo, 4, 1.85), material: mkLeafMat(0.3), depthMaterial: leafDepth(0.3) }] },
+        { maxDist: quality.lod[0], parts: [{ geometry: simplifyGeo(bGeo, 0.5, 0.004, 0.05), material: barkMat, depthMaterial: barkDepth, useColor: false }, { geometry: lGeo, material: mkLeafMat(0.42), depthMaterial: leafDepth(0.42) }] },
+        { maxDist: quality.lod[1], parts: [{ geometry: simplifyGeo(bGeo, 0.06, 0.06, 0.2), material: barkMat, depthMaterial: barkDepth, useColor: false }, { geometry: thinLeaves(lGeo, 4, 1.85), material: mkLeafMat(0.3), depthMaterial: leafDepth(0.3) }] },
         { maxDist: quality.lod[2], parts: [{ geometry: farTrunk(bGeo, trunkR), material: barkMat, castShadow: false, useColor: false }, { geometry: thinLeaves(lGeo, 16, 3.8), material: mkLeafMat(0.2), castShadow: false }] },
       ];
 

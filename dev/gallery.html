@@ -2,7 +2,6 @@
 <body><script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { MODELS } from '/src/assets.js';
 import { toFloatGeometry } from '/src/world/scatter.js';
 const params = new URLSearchParams(location.search);
@@ -12,7 +11,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8899aa);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x445533, 1.6)); const sun = new THREE.DirectionalLight(0xffffff, 3); sun.position.set(3, 5, 4); scene.add(sun);
 const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 200);
-const gl = new GLTFLoader(); gl.setMeshoptDecoder(MeshoptDecoder);
+const gl = new GLTFLoader();
 const list = only ? only.split(',') : MODELS;
 let x = 0; const items = [];
 for (const id of list) {

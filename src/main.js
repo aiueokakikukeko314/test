@@ -161,7 +161,7 @@ async function boot() {
   ui.on('toggleMode', () => setMode(mode === 'film' ? 'explore' : 'film'));
   ui.on('nextShot', () => cinematic.next());
   ui.on('toggleSound', () => { audio.start(); audio.setMuted(!audio.muted); ui.setSound(!audio.muted); });
-  ui.on('quality', (q) => { try { localStorage.setItem('forest-quality', q); } catch { /* private mode */ } const u = new URL(location.href); u.searchParams.delete('q'); location.href = u.toString(); });
+  ui.on('quality', (q) => { try { localStorage.setItem('forest-quality', q); } catch { /* private mode */ } location.reload(); });
   player.onStep = (kind, running) => audio.step(kind, running);
   player.onStick = (x, y, dx, dy) => ui.stick(x, y, dx, dy);
 

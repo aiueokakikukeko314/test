@@ -1,7 +1,6 @@
 // Asset loading (textures + CC0 scanned models from Poly Haven, see CREDITS.md).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 const BASE = import.meta.env.BASE_URL + 'assets/';
 
@@ -34,7 +33,6 @@ export async function loadAssets(quality, onProgress = () => {}) {
     tex[key] = t; tick();
   }));
   const gl = new GLTFLoader(manager);
-  gl.setMeshoptDecoder(MeshoptDecoder);
   const models = {};
   const modelJobs = MODELS.map((id) => gl.loadAsync(`${BASE}models/${id}.glb`).then((g) => { models[id] = g; tick(); }).catch((e) => { console.warn('model failed', id, e); tick(); }));
   await Promise.all([...texJobs, ...modelJobs]);

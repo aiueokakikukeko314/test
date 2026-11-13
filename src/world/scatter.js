@@ -1,7 +1,7 @@
 // Ground cover from photoscanned CC0 models (Poly Haven): mossy rocks, ferns, shrubs,
 // wildflowers, stumps, fallen logs and dead branches, scattered by habitat rules.
 import * as THREE from 'three';
-import { MeshoptSimplifier } from 'meshoptimizer';
+import { initSimplifier, simplifyIndices } from '../util/simplify.js';
 import { HALF, heightAt, normalAt, riverDist, riverHalfWidth, clearingFactor } from './layout.js';
 import { fbm, mulberry32, smoothstep } from '../util/noise.js';
 import { LodInstances, composeMatrix } from './instancing.js';
@@ -40,14 +40,8 @@ function extractVariants(gltf) {
   return out;
 }
 
-function simplified(geo, ratio, error) {
-  const idx = Uint32Array.from(geo.index.array);
-  const target = Math.max(60, Math.floor((idx.length * ratio) / 3) * 3);
-  // meshopt wants plain float positions; glTF data here may be quantised/interleaved
-  const pa = geo.attributes.position;
-  const pos = new Float32Array(pa.count * 3);
-  for (let i = 0; i < pa.count; i++) { pos[i * 3] = pa.getX(i); pos[i * 3 + 1] = pa.getY(i); pos[i * 3 + 2] = pa.getZ(i); }
-  const [out] = MeshoptSimplifier.simplify(idx, pos, 3, target, error);
+function simplified(geo, ratio, error, cell) {
+  const out = simplifyIndices(Uint32Array.from(geo.index.array), geo.attributes.position.array, ratio, error, cell);
   const g = new THREE.BufferGeometry();
   for (const name of Object.keys(geo.attributes)) g.setAttribute(name, geo.attributes[name]);
   g.setIndex(new THREE.BufferAttribute(out, 1));
@@ -55,7 +49,7 @@ function simplified(geo, ratio, error) {
 }
 
 export async function createScatter(models, shared, quality, world) {
-  await MeshoptSimplifier.ready;
+  await initSimplifier();
   const rand = mulberry32(777);
   const group = new THREE.Group();
   group.name = 'scatter';
@@ -118,7 +112,7 @@ export async function createScatter(models, shared, quality, world) {
       const shadow = spec.shadow !== false;
       const levels = [{ maxDist: spec.lodDist, parts: [{ geometry: v.geometry, material: mat, depthMaterial: depth, castShadow: shadow, layer: spec.layer }] }];
       if (spec.range > spec.lodDist) {
-        levels.push({ maxDist: spec.range, parts: [{ geometry: simplified(v.geometry, spec.lodRatio || 0.25, spec.lodError || 0.03), material: mat, depthMaterial: depth, castShadow: shadow && !plant, layer: spec.layer }] });
+        levels.push({ maxDist: spec.range, parts: [{ geometry: simplified(v.geometry, spec.lodRatio || 0.25, spec.lodError || 0.03, plant ? 0 : Math.max(v.size.x, v.size.y, v.size.z) * 0.09), material: mat, depthMaterial: depth, castShadow: shadow && !plant, layer: spec.layer }] });
       }
       const mats = new Float32Array(list.length * 16), cols = new Float32Array(list.length * 3);
       list.forEach((o, i) => {
